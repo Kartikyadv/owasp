@@ -7,9 +7,9 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-// Add auth token to requests
+// Add Cognito auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('cognito_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -21,23 +21,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Only redirect if we're not already on the auth redirect page
+      if (!window.location.pathname.includes('/auth/redirect')) {
+        // localStorage.removeItem('cognito_token');
+        // Redirect back to parent codelens project
+        window.location.href = process.env.REACT_APP_CODELENS_URL || 'https://codelens.cloudsanalytics.ai/';
+      }
     }
     return Promise.reject(error);
   }
 );
 
-export const authApi = {
-  login: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
-  },
-  register: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post('/auth/register', { email, password });
-    return response.data;
-  },
-};
+// Auth API removed - using Cognito authentication from parent project
 
 export const scansApi = {
   getAll: async (): Promise<Scan[]> => {

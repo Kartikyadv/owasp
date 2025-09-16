@@ -15,7 +15,7 @@ from database import get_db, init_db
 from models import User, Scan, Issue
 from sqlalchemy.orm import Session
 from schemas import UserCreate, UserLogin, ScanResponse, IssueResponse, ScanRequest
-from auth import create_access_token, verify_token, get_password_hash, verify_password
+from auth import verify_cognito_token, get_user_info_from_cognito_token
 from zap_client import ZAPClient
 from mock_data import get_mock_scans, get_mock_issues
 
@@ -51,59 +51,58 @@ async def startup_event():
 async def root():
     return {"message": "OWASP ZAP Security Dashboard API"}
 
-@app.post("/auth/register")
-async def register(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    db_user = User(email=user.email, hashed_password=hashed_password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+# Cognito authentication endpoints - these are now handled by the parent codelens project
+# We only need to verify tokens passed from the parent project
 
-@app.post("/auth/login")
-async def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+@app.get("/auth/redirect")
+async def auth_redirect(token: str = None):
+    """
+    Redirect endpoint to handle authentication from parent codelens project
+    This endpoint receives the Cognito token and redirects to the frontend with the token
+    """
+    if not token:
+        raise HTTPException(status_code=400, detail="Token parameter is required")
     
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Verify the token is valid
+    user_info = get_user_info_from_cognito_token(token)
+    if user_info is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Redirect to frontend auth redirect route with token
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3001")
+    redirect_url = f"{frontend_url}/auth/redirect?token={token}"
+    
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=redirect_url)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
-        print(f"Received token: {token[:20]}..." if token else "No token received")
-        payload = verify_token(token)
-        if payload is None:
-            print("Token verification failed")
+        print(f"Received Cognito token: {token[:20]}..." if token else "No token received")
+        
+        # Verify the Cognito token
+        user_info = get_user_info_from_cognito_token(token)
+        if user_info is None:
+            print("Cognito token verification failed")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
+                detail="Could not validate Cognito credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        print(f"Token verified for user: {payload.get('sub')}")
-        return payload.get("sub")
+        
+        print(f"Cognito token verified for user: {user_info.get('sub')} ({user_info.get('email')})")
+        return user_info
     except Exception as e:
-        print(f"Authentication error: {e}")
+        print(f"Cognito authentication error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Could not validate Cognito credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 @app.get("/scans", response_model=list[ScanResponse])
 async def get_scans(
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -131,7 +130,7 @@ async def get_scans(
 async def get_issues(
     severity: str = None,
     scan_id: str = None,
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -153,7 +152,7 @@ async def get_issues(
         return mock_issues
 
 @app.get("/stats")
-async def get_stats(current_user: str = Depends(get_current_user)):
+async def get_stats(current_user: dict = Depends(get_current_user)):
     try:
         stats = await burp_client.get_stats()
         return stats
@@ -173,7 +172,7 @@ async def get_stats(current_user: str = Depends(get_current_user)):
 async def start_scan(
     request: Request,
     scan_request: ScanRequest,
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -257,7 +256,7 @@ async def start_scan(
 
 @app.get("/scans/active")
 async def get_active_scans(
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -302,7 +301,7 @@ async def get_active_scans(
 
 @app.get("/scans/completed")
 async def get_completed_scans(
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Mock completed scans data
@@ -343,21 +342,21 @@ async def get_completed_scans(
 @app.post("/scans/{scan_id}/pause")
 async def pause_scan(
     scan_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     return {"scan_id": scan_id, "status": "paused"}
 
 @app.post("/scans/{scan_id}/resume")
 async def resume_scan(
     scan_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     return {"scan_id": scan_id, "status": "resumed"}
 
 @app.post("/scans/{scan_id}/stop")
 async def stop_scan(
     scan_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     try:
         result = await zap_client.stop_scan(scan_id)
@@ -369,7 +368,7 @@ async def stop_scan(
 @app.get("/scans/{scan_id}/progress")
 async def get_scan_progress(
     scan_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     try:
         progress = await zap_client.get_scan_progress(scan_id)
@@ -381,7 +380,7 @@ async def get_scan_progress(
 @app.get("/export/{format}")
 async def export_data(
     format: str,
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     if format not in ["csv", "json"]:

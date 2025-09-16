@@ -1,36 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Shield, Mail, Lock } from 'lucide-react';
+import { Shield, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { logout } = useAuth();
 
-  const { login, register } = useAuth();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await register(email, password);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
+  const handleRedirectToParent = () => {
+    // Redirect to parent codelens project for authentication
+    window.location.href = process.env.REACT_APP_CODELENS_URL || 'https://codelens.cloudsanalytics.ai/';
   };
 
   return (
@@ -52,89 +32,31 @@ const Login: React.FC = () => {
               <Shield className="h-8 w-8 text-primary-foreground" />
             </motion.div>
             <CardTitle className="text-2xl font-bold">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
+              Authentication Required
             </CardTitle>
             <CardDescription>
-              {isLogin 
-                ? 'Sign in to access your security dashboard'
-                : 'Sign up to start monitoring your security'
-              }
+              Please authenticate through the main CodeLens application to access the OWASP security dashboard.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
+          <CardContent className="space-y-4">
+            <div className="text-center text-sm text-muted-foreground">
+              This application uses centralized authentication. You need to be logged in through the main CodeLens platform to access this security dashboard.
+            </div>
 
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
+            <Button
+              onClick={handleRedirectToParent}
+              className="w-full"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go to CodeLens Authentication
+            </Button>
 
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-sm text-red-500 bg-red-50 p-3 rounded-md"
-                >
-                  {error}
-                </motion.div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    {isLogin ? 'Signing in...' : 'Creating account...'}
-                  </div>
-                ) : (
-                  isLogin ? 'Sign In' : 'Create Account'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
+            <div className="text-center">
               <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-sm text-primary hover:underline"
+                onClick={logout}
+                className="text-sm text-muted-foreground hover:underline"
               >
-                {isLogin 
-                  ? "Don't have an account? Sign up"
-                  : "Already have an account? Sign in"
-                }
+                Clear session and try again
               </button>
             </div>
           </CardContent>

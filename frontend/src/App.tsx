@@ -5,10 +5,12 @@ import { ToastProvider } from './components/ui/toast';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
+import AuthRedirect from './components/AuthRedirect';
 import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
+  console.log(isAuthenticated)
 
   if (loading) {
     return (
@@ -32,11 +34,16 @@ const AppContent: React.FC = () => {
           element={isAuthenticated ? <Navigate to="/" /> : <Login />}
         />
         <Route
+          path="/auth/redirect"
+          element={<AuthRedirect />}
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
+                {/* <h1>hui</h1> */}
               </Layout>
             </ProtectedRoute>
           }
