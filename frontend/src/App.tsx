@@ -10,7 +10,6 @@ import './index.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  console.log(isAuthenticated)
 
   if (loading) {
     return (

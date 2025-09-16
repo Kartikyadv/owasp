@@ -13,24 +13,33 @@ const AuthRedirect: React.FC = () => {
   const [message, setMessage] = useState('Verifying authentication...');
 
   useEffect(() => {
-    const token = searchParams.get('token');
+    const accessToken = searchParams.get('accesstoken');
+    const idToken = searchParams.get('idtoken');
     
-    if (!token) {
+    if (!accessToken) {
       setStatus('error');
-      setMessage('No authentication token provided');
+      setMessage('No access token provided');
       return;
     }
 
-    // Store the token and redirect to dashboard
+    // Store the tokens and redirect to dashboard
     try {
-      // Verify token format (basic check)
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        throw new Error('Invalid token format');
+      // Verify access token format (basic check)
+      const accessTokenParts = accessToken.split('.');
+      if (accessTokenParts.length !== 3) {
+        throw new Error('Invalid access token format');
       }
       
-      // Use the setToken method from AuthContext
-      setToken(token);
+      // Verify ID token format if provided (basic check)
+      if (idToken) {
+        const idTokenParts = idToken.split('.');
+        if (idTokenParts.length !== 3) {
+          throw new Error('Invalid ID token format');
+        }
+      }
+      
+      // Use the setToken method from AuthContext with both tokens
+      setToken(accessToken, idToken || undefined);
       
       setStatus('success');
       setMessage('Authentication successful! Redirecting...');
@@ -43,7 +52,7 @@ const AuthRedirect: React.FC = () => {
     } catch (error) {
       console.error('Token validation error:', error);
       setStatus('error');
-      setMessage('Invalid authentication token');
+      setMessage('Invalid authentication tokens');
       
       // Redirect to login after error
       setTimeout(() => {

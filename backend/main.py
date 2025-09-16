@@ -55,22 +55,26 @@ async def root():
 # We only need to verify tokens passed from the parent project
 
 @app.get("/auth/redirect")
-async def auth_redirect(token: str = None):
+async def auth_redirect(accesstoken: str = None, idtoken: str = None):
     """
     Redirect endpoint to handle authentication from parent codelens project
-    This endpoint receives the Cognito token and redirects to the frontend with the token
+    This endpoint receives the Cognito access token and ID token and redirects to the frontend
     """
-    if not token:
-        raise HTTPException(status_code=400, detail="Token parameter is required")
+    if not accesstoken:
+        raise HTTPException(status_code=400, detail="Access token parameter is required")
     
-    # Verify the token is valid
-    user_info = get_user_info_from_cognito_token(token)
+    # Verify the access token is valid
+    user_info = get_user_info_from_cognito_token(accesstoken)
     if user_info is None:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid access token")
     
-    # Redirect to frontend auth redirect route with token
+    # Redirect to frontend auth redirect route with both tokens
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3001")
-    redirect_url = f"{frontend_url}/auth/redirect?token={token}"
+    redirect_url = f"{frontend_url}/auth/redirect?accesstoken={accesstoken}"
+    
+    # Add idtoken to URL if provided
+    if idtoken:
+        redirect_url += f"&idtoken={idtoken}"
     
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=redirect_url)
