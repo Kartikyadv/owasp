@@ -1,0 +1,24 @@
+# Virtual environment
+venv/
+__pycache__/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Logs
+*.log
+*.out
+*.err
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build / Cache
+dist/
+build/
+.cache/
