@@ -6,7 +6,7 @@ from schemas import ScanResponse, IssueResponse
 from datetime import datetime
 
 class ZAPClient:
-    def __init__(self, base_url: str = "http://zap:8080"):
+    def __init__(self, base_url: str = "http://localhost:8080"):
         self.base_url = base_url
         self.session = httpx.AsyncClient(
             timeout=httpx.Timeout(60.0, connect=10.0),
